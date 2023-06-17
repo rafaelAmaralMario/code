@@ -1,0 +1,35 @@
+version: "3"
+services:
+  ui:
+    build:
+      context: ./UI
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - ia
+  ia:
+    build:
+      context: ./IA
+      dockerfile: Dockerfile
+    cap_add:
+      - ALL
+    ports:
+      - 5000:5000
+    depends_on:
+      - db
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids: ['0']
+            capabilities: [gpu]
+  db:
+    image: postgres:latest
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: uiprototype
+      POSTGRES_PASSWORD: uiprototype
+      POSTGRES_DB: uiprototype

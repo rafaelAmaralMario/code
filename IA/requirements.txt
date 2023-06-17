@@ -1,0 +1,14 @@
+flask
+tensorflow
+pandas
+numpy
+keras
+opencv-python
+psycopg2
+spark
+nltk
+flask_sqlalchemy
+pyspark
+python-magic
+numpy
+python-magic-bin
