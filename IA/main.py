@@ -7,6 +7,8 @@ from keras.models import model_from_json
 from pyspark.sql import SparkSession
 from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 import uuid
+from utils import get_data_type, get_numtime_steps,get_extracted_data
+
 
 nltk.download('punkt')
 
@@ -116,9 +118,12 @@ def get_data():
 
 @app.route('/train', methods=['POST'])
 def train_model():
-    input_data = request.json['input_data']
-    name = request.json['name']
-    target_data = request.json['target_data']
+    if request.headers['Content-Type'] != 'multipart/form-data':
+        return 'Unsupported media type. Please use multipart/form-data.', 415
+    
+    input_data = request.files['input_data']
+    name = request.form['name']
+    target_data = request.form['target_data']
     save_training_data_to_spark(input_data, target_data)
 
     models = neural_networks.create_neural_networks(input_data, num_models, True)
@@ -130,7 +135,7 @@ def train_model():
 
 @app.route('/predict', methods=['POST'])
 def predict_model():
-    input_data = request.json['input_data']
+    input_data = request.files['input_data']
     models = load_models_locally()
     predictions = predict_models(input_data, models)
     combined_predictions = combine_predictions(predictions)
@@ -154,15 +159,41 @@ def get_messages():
 
 @app.route('/train_unsupervised', methods=['POST'])
 def train_unsupervised():
+    if request.mimetype != 'multipart/form-data':
+        return 'Unsupported media type. Please use multipart/form-data.', 415
+    
     return train_unsupervised_model()
 
 # Resto do código
 
 def train_unsupervised_model():
-    input_data = request.json['input_data']
-    name = request.json['name']
-    models = neural_networks.create_neural_networks(input_data, num_models,False)
-    unsupervised_models = train_unsupervised_models(input_data, models)
+    input_data = request.files['input_data']
+     # Acessar os dados do arquivo
+    file_data = input_data.stream.read()
+    name = request.form['name']
+    filename = input_data.filename
+
+    data_type, data_subtype = get_data_type(filename)
+
+    extracted_data = get_extracted_data(file_data, data_subtype)
+    file_size = file_data.__len__()
+    
+    timestep_size = {
+    'audio': 0.001,   # 1 millisecond
+    'video': 0.02,    # 20 milliseconds
+    'image': 0.05,    # 50 milliseconds
+    'text': 0.5,      # 500 milliseconds (0.5 seconds)
+    'pdf': 0.5,       # 500 milliseconds (0.5 seconds)
+    'csv': 0.05,      # 50 milliseconds
+    'excel': 0.05,    # 50 milliseconds
+    'word': 0.05      # 50 milliseconds
+    }
+    
+    num_timesteps = int(file_size / timestep_size.get(data_subtype))
+
+    models = neural_networks.create_neural_networks(5,False,num_timesteps, data_type, file_size)
+
+    unsupervised_models = train_unsupervised_models(extracted_data, models)
 
     save_model_to_spark(name,unsupervised_models)
     save_models_locally(name,unsupervised_models)
