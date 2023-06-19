@@ -12,3 +12,5 @@ pyspark
 python-magic
 numpy
 python-magic-bin
+PyPDF2
+python-docx
